@@ -1,4 +1,4 @@
-# VsCodeStormworks
+# Stormworks Projects
 
 This repository contains Lua scripts and systems for Stormworks development.
 
