@@ -7,3 +7,7 @@ ProjectUltramodern/.hidden
 _intermediate/
 _release/
 .microproject
+sw-micro/
+.luarc.json
+.microproject
+*.hidden
