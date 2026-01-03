@@ -118,9 +118,9 @@ def filter_main_sequence(ratios):
 
 STRATEGIES = {
     "Balanced": {
-        "range": 2.0,
-        "smoothness": 1.0,
-        "utilization": 1.0,
+        "range": 5.0,
+        "smoothness": 0.5,
+        "utilization": 10.0,
         "filter_max": False,
     },
     "Range First": {
@@ -135,16 +135,10 @@ STRATEGIES = {
         "utilization": 0.5,
         "filter_max": False,
     },
-    "Max Gears": {
-        "range": 2.0,
-        "smoothness": 0.5,
-        "utilization": 10.0,
-        "filter_max": False,
-    },
     "Quality Over Quantity": {
         "range": 10.0,
         "smoothness": 10.0,
-        "utilization": 10.0,
+        "utilization": 0.5,
         "filter_max": False,
     },
 }
@@ -236,4 +230,20 @@ def find_best_configurations(
     # Sort by score (ascending)
     best_results.sort(key=lambda x: x["score"])
 
-    return best_results[:top_n]
+    # Filter for distinct scores
+    unique_results = []
+    seen_scores = set()
+
+    for res in best_results:
+        # Round score to avoid float precision issues hiding duplicates
+        # 4 decimal places should be sufficient differentiation
+        rounded_score = round(res["score"], 4)
+        
+        if rounded_score not in seen_scores:
+            seen_scores.add(rounded_score)
+            unique_results.append(res)
+            
+            if len(unique_results) >= top_n:
+                break
+
+    return unique_results
