@@ -40,8 +40,8 @@ function TractionControl.update(input, config, state, output)
 			-- B: Push power forward
 			-- Reduce rear power, increase front power bias
 			-- This is handled by modifying torque split
-			output.torqueSplitFront = math.min(1.0, output.torqueSplitFront + config.driftPowerShift)
-			output.torqueSplitRear = math.max(0.0, output.torqueSplitRear - config.driftPowerShift)
+			state.torqueSplitFront = math.min(1.0, state.torqueSplitFront + config.driftPowerShift)
+			state.torqueSplitRear = math.max(0.0, state.torqueSplitRear - config.driftPowerShift)
 		end
 	end
 

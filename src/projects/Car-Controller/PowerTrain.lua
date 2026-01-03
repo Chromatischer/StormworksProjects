@@ -16,8 +16,8 @@ function PowerTrain.update(input, config, state, output)
 	end
 
 	-- Base Torque Split (modified by TractionControl)
-	local splitF = output.torqueSplitFront or 0.5
-	local splitR = output.torqueSplitRear or 0.5
+	local splitF = state.torqueSplitFront or 0.5
+	local splitR = state.torqueSplitRear or 0.5
 
 	-- Calculate Target Wheel RPS (Acceleration Control)
 	-- omega = (v + alpha) / (pi * d)
@@ -48,9 +48,9 @@ function PowerTrain.update(input, config, state, output)
 	end
 
 	-- Apply Anti-Lag Override
-	if output.clutchOverride ~= nil then
-		clutchF = output.clutchOverride
-		clutchR = output.clutchOverride
+	if state.clutchOverride ~= nil then
+		clutchF = state.clutchOverride
+		clutchR = state.clutchOverride
 	end
 
 	-- Final Assignment with Torque Split

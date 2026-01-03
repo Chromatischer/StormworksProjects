@@ -23,6 +23,7 @@ require("src.projects.Car-Controller.TractionControl")
 ---@field antiLagRPS number RPS to hold AntiLag
 ---@field shiftUpRPS number
 ---@field shiftDownRPS number
+---@field maxGear number Maximum gear number
 ---@field shiftCooldown number ticks
 ---@field shiftCornerThreshold number Rad/s
 ---@field slipOffset number Allowed slip speed (m/s)
@@ -47,6 +48,7 @@ local config = {
 	antiLagRPS = 21,
 	shiftUpRPS = 20,
 	shiftDownRPS = 15,
+	maxGear = 6,
 	shiftCooldown = 30,
 	shiftCornerThreshold = 0.5,
 	slipOffset = 2.0,
@@ -87,6 +89,9 @@ local carInput = {
 ---@field wheelRPS_Front number
 ---@field wheelRPS_Rear number
 ---@field gearCooldown number
+---@field torqueSplitFront number
+---@field torqueSplitRear number
+---@field clutchOverride number|nil
 local carState = {
 	driftAngle = 0,
 	forwardSpeed = 0,
@@ -94,6 +99,9 @@ local carState = {
 	wheelRPS_Front = 0,
 	wheelRPS_Rear = 0,
 	gearCooldown = 0,
+	torqueSplitFront = 0.5,
+	torqueSplitRear = 0.5,
+	clutchOverride = nil,
 }
 
 ---@class CarOutput
@@ -106,11 +114,7 @@ local carState = {
 ---@field brakeRear number 0-1
 ---@field clutchFront number 0-1
 ---@field clutchRear number 0-1
----@field shiftUp boolean
----@field shiftDown boolean
----@field torqueSplitFront number
----@field torqueSplitRear number
----@field clutchOverride number|nil
+---@field gear integer
 local carOutput = {
 	steerFL = 0,
 	steerFR = 0,
@@ -121,11 +125,7 @@ local carOutput = {
 	brakeRear = 0,
 	clutchFront = 0,
 	clutchRear = 0,
-	shiftUp = false,
-	shiftDown = false,
-	torqueSplitFront = 0.5,
-	torqueSplitRear = 0.5,
-	clutchOverride = nil,
+	gear = 0,
 }
 
 function onTick()
@@ -194,7 +194,16 @@ function onTick()
 
 	PowerTrain.update(carInput, config, carState, carOutput)
 
-	-- output.setNumber(...)
+	output.setNumber(1, carOutput.steerFL)
+	output.setNumber(2, carOutput.steerFR)
+	output.setNumber(3, carOutput.steerRL)
+	output.setNumber(4, carOutput.steerRR)
+	output.setNumber(5, carOutput.engineThrottle)
+	output.setNumber(6, carOutput.brakeFront)
+	output.setNumber(7, carOutput.brakeRear)
+	output.setNumber(8, carOutput.clutchFront)
+	output.setNumber(9, carOutput.clutchRear)
+	output.setNumber(10, carOutput.gear)
 end
 
 function onDraw()
@@ -202,4 +211,5 @@ function onDraw()
 	screen.drawText(2, 2, "Mode: " .. config.mode)
 	screen.drawText(2, 10, "Speed: " .. string.format("%.1f", carState.forwardSpeed))
 	screen.drawText(2, 18, "Drift: " .. string.format("%.2f", carState.driftAngle))
+	screen.drawText(2, 26, "Gear: " .. tostring(carOutput.gear))
 end
