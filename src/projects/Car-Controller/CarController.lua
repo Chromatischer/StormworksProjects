@@ -5,7 +5,7 @@ require("src.projects.Car-Controller.PowerTrain")
 require("src.projects.Car-Controller.TractionControl")
 
 ---@class CarConfig
----@field throttleLowThreshold number Determine when "no throttle" can be assumed
+---@field pedalLowThreshold number Determine when "no throttle" can be assumed
 ---@field wheelbase number Distance between axles (m)
 ---@field trackWidthFront number Front axle width (m)
 ---@field trackWidthRear number Rear axle width (m)
@@ -21,6 +21,7 @@ require("src.projects.Car-Controller.TractionControl")
 ---@field absSlipThreshold number 0-1
 ---@field maxRPS number Engine Redline
 ---@field antiLagRPS number RPS to hold AntiLag
+---@field antiLagMaxDuration number maximum duration to hold antiLag for
 ---@field shiftUpRPS number
 ---@field shiftDownRPS number
 ---@field maxGear number Maximum gear number
@@ -29,30 +30,31 @@ require("src.projects.Car-Controller.TractionControl")
 ---@field slipOffset number Allowed slip speed (m/s)
 ---@field clutchGain number
 ---@field mode string "Neutral", "Drive", "Sport", "Reverse"
-local config = {
-	throttleLowThreshold = 0.05,
-	wheelbase = 3.0,
-	trackWidthFront = 1.5,
-	trackWidthRear = 1.5,
+config = {
+	pedalLowThreshold = 0.05,
+	wheelbase = 3.25,
+	trackWidthFront = 2.25,
+	trackWidthRear = 2.25,
 	wheelDiameter = 0.75,
-	maxSteerAngle = 0.5, -- ~30 degrees
-	steerBias = 0.5,
+	maxSteerAngle = 1, -- ~30 degrees
+	steerBias = 0.5, -- Shift Center of Control
 	steerAssistSlope = -0.02, -- Reduces steering as speed increases
 	steerAssistOffset = 1.0,
 	steerAssistMin = 0.2,
-	driftThreshold = 0.2, -- ~11 degrees
-	counterSteerGain = 1.0,
-	driftPowerShift = 0.05,
+	driftThreshold = 2.2, -- ~11 degrees
+	counterSteerGain = -0.1,
+	driftPowerShift = 0.0,
 	absSlipThreshold = 0.6,
 	maxRPS = 22,
 	antiLagRPS = 21,
+	antiLagMaxDuration = 180, -- ticks
 	shiftUpRPS = 20,
 	shiftDownRPS = 15,
-	maxGear = 6,
+	maxGear = 8,
 	shiftCooldown = 30,
 	shiftCornerThreshold = 0.5,
-	slipOffset = 2.0,
-	clutchGain = 0.5,
+	slipOffset = 1.0, -- Allowed overshoot Traction Control
+	clutchGain = 0.2,
 	mode = "Drive",
 }
 
@@ -68,7 +70,7 @@ local config = {
 ---@field wheelRPS_Front number
 ---@field wheelRPS_Rear number
 ---@field modeSelection integer
-local carInput = {
+carInput = {
 	throttle = 0,
 	brake = 0,
 	steering = 0,
@@ -79,11 +81,13 @@ local carInput = {
 	carAngle = 0,
 	wheelRPS_Front = 0,
 	wheelRPS_Rear = 0,
-	modeSelection = 0,
+	modeSelection = 0, --TODO: Move to carState machine
 }
 
 ---@class CarState
 ---@field driftAngle number
+---@field driftQuotient number
+---@field ticks number global ticks counter
 ---@field forwardSpeed number
 ---@field angularVelocity number
 ---@field wheelRPS_Front number
@@ -92,8 +96,12 @@ local carInput = {
 ---@field torqueSplitFront number
 ---@field torqueSplitRear number
 ---@field clutchOverride number|nil
-local carState = {
+---@field antiLagRequest boolean
+---@field antiLagCurrentDuration number current duration antiLag has been active for in ticks
+carState = {
+	ticks = 0,
 	driftAngle = 0,
+	driftQuotient = 0,
 	forwardSpeed = 0,
 	angularVelocity = 0,
 	wheelRPS_Front = 0,
@@ -102,6 +110,8 @@ local carState = {
 	torqueSplitFront = 0.5,
 	torqueSplitRear = 0.5,
 	clutchOverride = nil,
+	antiLagRequest = false,
+	antiLagCurrentDuration = 0,
 }
 
 ---@class CarOutput
@@ -115,7 +125,7 @@ local carState = {
 ---@field clutchFront number 0-1
 ---@field clutchRear number 0-1
 ---@field gear integer
-local carOutput = {
+carOutput = {
 	steerFL = 0,
 	steerFR = 0,
 	steerRL = 0,
@@ -129,6 +139,20 @@ local carOutput = {
 }
 
 function onTick()
+	carState.ticks = carState.ticks + 1
+	-- Load config
+	if carState.ticks < 20 then
+		for key, value in ipairs(config) do
+			if type(value) == type(1) then
+				value = property.getNumber("Config " .. string.lower(key)) ~= 0
+						and property.getNumber("Config " .. string.lower(key))
+					or value
+				--TODO: This is not great since it does not allow overwriting values with 0 but It'll work
+				-- Fix by using String input and parsing if not empty string!
+				--TODO: ofc this doesn't work... variable names are shortened you idiot!
+			end
+		end
+	end
 	-- Driver Inputs
 	carInput.throttle = input.getNumber(1) -- Range: 0 to 1
 	carInput.brake = input.getNumber(2) -- Range: 0 to 1
@@ -150,7 +174,6 @@ function onTick()
 	carInput.wheelRPS_Front = input.getNumber(11) -- Front Axle RPS
 	carInput.wheelRPS_Rear = input.getNumber(12) -- Rear Axle RPS
 
-	-- 2. Update State
 	carState.forwardSpeed = carInput.forwardSpeed
 	carState.angularVelocity = carInput.angularVelocity
 	carState.wheelRPS_Front = carInput.wheelRPS_Front
@@ -170,7 +193,7 @@ function onTick()
 
 	-- Calculate Drift Angle
 	-- Angle between velocity vector and car heading
-	-- Assuming car heading is 0 in local space if velocity is local
+	-- Assuming car heading is 0 in   space if velocity is
 	-- If velocityVector is global, we need carAngle.
 	-- Assuming carInput.velocityVector is LOCAL to car (X forward, Z right)
 	-- beta_v = atan(z, x)
@@ -181,18 +204,17 @@ function onTick()
 		carState.driftAngle = 0
 	end
 
-	-- A. Steering
-	local fl, fr, rl, rr = Ackermann.calculateSteering(carInput, config, carState)
-	carOutput.steerFL = fl
-	carOutput.steerFR = fr
-	carOutput.steerRL = rl
-	carOutput.steerRR = rr
-
 	TractionControl.update(carInput, config, carState, carOutput)
 
 	Gearbox.update(carInput, config, carState, carOutput)
 
 	PowerTrain.update(carInput, config, carState, carOutput)
+
+	fl, fr, rl, rr = Ackermann.calculateSteering(carInput, config, carState)
+	carOutput.steerFL = fl
+	carOutput.steerFR = fr
+	carOutput.steerRL = rl
+	carOutput.steerRR = rr
 
 	output.setNumber(1, carOutput.steerFL)
 	output.setNumber(2, carOutput.steerFR)

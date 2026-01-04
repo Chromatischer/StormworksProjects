@@ -18,12 +18,11 @@ function Ackermann.calculateSteering(input, config, state)
 	-- Formula: alpha_out = alpha_in * (a * |v| + b)
 	-- where a is slope, b is offset (usually 1 at speed 0)
 
-	local speed = math.abs(state.forwardSpeed)
-	local assistFactor =
-		math.clamp(config.steerAssistSlope * speed + config.steerAssistOffset, config.steerAssistMin, 1.0)
+	speed = math.abs(state.forwardSpeed)
+	assistFactor = math.clamp(config.steerAssistSlope * speed + config.steerAssistOffset, config.steerAssistMin, 1.0)
 
 	-- Apply assist to raw input (-1 to 1)
-	local requestedAngle = input.steering * config.maxSteerAngle * assistFactor
+	requestedAngle = input.steering * config.maxSteerAngle * assistFactor
 
 	-- 2. Ackermann Geometry
 	-- R = l / tan(eta)
@@ -32,10 +31,10 @@ function Ackermann.calculateSteering(input, config, state)
 		return 0, 0, 0, 0
 	end
 
-	local L = config.wheelbase
-	local w_f = config.trackWidthFront
-	local w_r = config.trackWidthRear
-	local lambda = config.steerBias -- 0.5 balanced, 1.0 rear biased, 0.0 front biased
+	L = config.wheelbase
+	w_f = config.trackWidthFront
+	w_r = config.trackWidthRear
+	lambda = config.steerBias -- 0.5 balanced, 1.0 rear biased, 0.0 front biased
 
 	if config.mode == "Reverse" then
 		-- Only basic steering (Front wheels only), no rear steering
@@ -46,30 +45,30 @@ function Ackermann.calculateSteering(input, config, state)
 
 	-- Calculate Turn Radius
 	-- requestedAngle is eta
-	local tanEta = math.tan(requestedAngle)
-	local R = L / tanEta
+	tanEta = math.tan(requestedAngle)
+	R = L / tanEta
 
 	-- Distances from Center of Rotation to axles
-	local distFront = (1 - lambda) * L
-	local distRear = lambda * L
+	distFront = (1 - lambda) * L
+	distRear = lambda * L
 
 	-- Calculate individual wheel angles
 	-- Front Left (alpha)
 	-- alpha = arctan( (1-lambda)*l / (R - a/2) )
 	-- Here a is track width (w_f)
-	local fl = math.atan(distFront / (R - w_f / 2))
+	fl = math.atan(distFront / (R - w_f / 2))
 
 	-- Front Right (beta)
 	-- beta = arctan( (1-lambda)*l / (R + a/2) )
-	local fr = math.atan(distFront / (R + w_f / 2))
+	fr = math.atan(distFront / (R + w_f / 2))
 
 	-- Rear Left (gamma)
 	-- gamma = -arctan( lambda*l / (R - b/2) )
-	local rl = -math.atan(distRear / (R - w_r / 2))
+	rl = -math.atan(distRear / (R - w_r / 2))
 
 	-- Rear Right (delta)
 	-- delta = -arctan( lambda*l / (R + b/2) )
-	local rr = -math.atan(distRear / (R + w_r / 2))
+	rr = -math.atan(distRear / (R + w_r / 2))
 
 	return fl, fr, rl, rr
 end

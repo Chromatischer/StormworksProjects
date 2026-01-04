@@ -38,9 +38,14 @@ function Gearbox.update(carInput, config, carState, carOutput)
 			return
 		end
 
+		-- If no throttle input is given no shifting should be done
+		if carInput.throttle < config.pedalLowThreshold then
+			return
+		end
+
 		-- Automatic shifting logic
-		local currentRPS = carInput.engineRPS
-		
+		currentRPS = carInput.engineRPS
+
 		-- Don't shift if cornering hard
 		if math.abs(carInput.angularVelocity) > config.shiftCornerThreshold then
 			return
@@ -59,5 +64,3 @@ function Gearbox.update(carInput, config, carState, carOutput)
 		end
 	end
 end
-
-return Gearbox
